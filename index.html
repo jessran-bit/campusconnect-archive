@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CampusConnect Crisis — PM Simulation</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0d0d12;
+    --surface: #14141c;
+    --card: #1a1a26;
+    --border: #2a2a3a;
+    --accent: #7c6af7;
+    --accent2: #e86b4f;
+    --accent3: #4fc98e;
+    --warn: #f0c644;
+    --text: #e8e8f0;
+    --muted: #7878a0;
+    --danger: #e84f4f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── SCANLINES OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+    pointer-events: none; z-index: 9999;
+  }
+
+  /* ── HEADER ── */
+  header {
+    padding: 24px 32px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; letter-spacing: -0.5px; }
+  .logo span { color: var(--accent); }
+  .header-meta { display: flex; gap: 20px; align-items: center; }
+  .badge { font-family: 'DM Mono', monospace; font-size: 11px; background: var(--border); padding: 4px 10px; border-radius: 4px; color: var(--muted); }
+  .badge.live { background: rgba(124,106,247,0.15); color: var(--accent); border: 1px solid rgba(124,106,247,0.3); }
+
+  /* ── HEALTH BAR ── */
+  .health-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 32px;
+    display: flex; gap: 32px; align-items: center;
+  }
+  .metric { display: flex; flex-direction: column; gap: 4px; }
+  .metric-label { font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  .metric-bar { width: 120px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .metric-fill { height: 100%; border-radius: 3px; transition: width 0.8s cubic-bezier(0.4,0,0.2,1), background 0.5s; }
+  .metric-value { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; }
+
+  /* ── MAIN ── */
+  main { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* ── SCREENS ── */
+  .screen { display: none; animation: fadeIn 0.4s ease; }
+  .screen.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── INTRO ── */
+  .intro-eyebrow { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 16px; }
+  .intro-title { font-family: 'Syne', sans-serif; font-size: 48px; font-weight: 800; line-height: 1.05; letter-spacing: -1px; margin-bottom: 20px; }
+  .intro-title em { color: var(--accent); font-style: normal; }
+  .intro-sub { font-size: 16px; color: var(--muted); max-width: 520px; margin-bottom: 40px; line-height: 1.7; }
+  .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 36px; }
+  .role-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .role-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .role-card.selected { border-color: var(--accent); background: rgba(124,106,247,0.1); }
+  .role-card.selected::after { content: '✓'; position: absolute; top: 12px; right: 14px; color: var(--accent); font-size: 14px; }
+  .role-emoji { font-size: 24px; margin-bottom: 8px; }
+  .role-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  .role-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .role-responsibility { font-size: 11px; color: var(--accent); margin-top: 6px; font-family: 'DM Mono', monospace; }
+
+  .start-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 16px 40px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .start-btn:hover { background: #9080ff; transform: translateY(-2px); }
+  .start-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* ── ROUND ── */
+  .round-header { margin-bottom: 32px; }
+  .round-tag { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; display: flex; gap: 12px; align-items: center; }
+  .round-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); display: inline-block; animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+  .round-title { font-family: 'Syne', sans-serif; font-size: 30px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px; }
+
+  /* ── INCOMING MESSAGE ── */
+  .incoming {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--warn);
+    border-radius: 0 12px 12px 0;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .incoming::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, var(--warn), transparent); }
+  .incoming-from { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--warn); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .incoming-text { font-size: 14px; color: var(--text); line-height: 1.6; font-style: italic; }
+
+  /* ── SCENARIO ── */
+  .scenario-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 28px;
+  }
+  .scenario-label { font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 12px; }
+  .scenario-text { font-size: 16px; line-height: 1.75; color: var(--text); }
+  .scenario-text strong { color: var(--accent2); }
+
+  /* ── TIMER ── */
+  .timer-wrap { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  .timer-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
+  .timer-display { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 500; color: var(--warn); min-width: 52px; }
+  .timer-display.urgent { color: var(--danger); animation: flash 0.5s ease-in-out infinite; }
+  @keyframes flash { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .timer-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .timer-progress { height: 100%; background: var(--warn); border-radius: 2px; transition: width 1s linear, background 0.5s; }
+
+  /* ── CHOICES ── */
+  .choices-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px; }
+  .choices { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+  .choice-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 24px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text);
+    position: relative;
+    overflow: hidden;
+  }
+  .choice-btn::before { content: ''; position: absolute; inset: 0; background: var(--accent); opacity: 0; transition: opacity 0.2s; }
+  .choice-btn:hover { border-color: var(--accent); transform: translateX(6px); }
+  .choice-btn:hover::before { opacity: 0.05; }
+  .choice-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .choice-key { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--accent); margin-bottom: 6px; display: block; }
+  .choice-text { font-size: 15px; line-height: 1.5; font-weight: 500; position: relative; }
+  .choice-sub { font-size: 12px; color: var(--muted); margin-top: 4px; position: relative; }
+
+  /* ── CONSEQUENCE ── */
+  .consequence {
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin-bottom: 28px;
+    border: 1px solid;
+    position: relative;
+    overflow: hidden;
+  }
+  .consequence.positive { background: rgba(79,201,142,0.08); border-color: rgba(79,201,142,0.25); }
+  .consequence.negative { background: rgba(232,75,75,0.08); border-color: rgba(232,75,75,0.25); }
+  .consequence.mixed { background: rgba(240,198,68,0.08); border-color: rgba(240,198,68,0.25); }
+  .consequence-icon { font-size: 24px; margin-bottom: 10px; display: block; }
+  .consequence-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; margin-bottom: 8px; }
+  .consequence.positive .consequence-title { color: var(--accent3); }
+  .consequence.negative .consequence-title { color: var(--danger); }
+  .consequence.mixed .consequence-title { color: var(--warn); }
+  .consequence-text { font-size: 14px; color: var(--muted); line-height: 1.65; }
+
+  .next-btn {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 14px 32px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .next-btn:hover { background: rgba(124,106,247,0.1); transform: translateY(-2px); }
+
+  /* ── OUTCOME ── */
+  .outcome-wrapper { text-align: center; padding: 20px 0; }
+  .outcome-emoji { font-size: 64px; display: block; margin-bottom: 20px; }
+  .outcome-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px; }
+  .outcome-title { font-family: 'Syne', sans-serif; font-size: 36px; font-weight: 800; letter-spacing: -1px; margin-bottom: 16px; line-height: 1.1; }
+  .outcome-desc { font-size: 16px; color: var(--muted); max-width: 540px; margin: 0 auto 36px; line-height: 1.7; }
+  .outcome-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 36px; }
+  .stat-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  .stat-num { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; display: block; margin-bottom: 4px; }
+  .stat-label { font-size: 12px; color: var(--muted); }
+  .roleplay-card {
+    background: var(--card);
+    border: 1px solid rgba(124,106,247,0.3);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 24px;
+    text-align: left;
+  }
+  .roleplay-card h3 { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--accent); }
+  .roleplay-card p { font-size: 14px; color: var(--muted); line-height: 1.7; margin-bottom: 8px; }
+  .roleplay-card .script-item { border-left: 2px solid var(--border); padding: 8px 14px; margin: 8px 0; font-size: 13px; }
+  .roleplay-card .script-role { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+  .roleplay-card .script-line { color: var(--text); }
+
+  .restart-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 14px 32px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: 12px;
+  }
+  .restart-btn:hover { border-color: var(--muted); color: var(--text); }
+  .btn-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+
+  /* ── PROGRESS DOTS ── */
+  .progress-dots { display: flex; gap: 8px; margin-bottom: 32px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); transition: all 0.3s; }
+  .dot.done { background: var(--accent3); }
+  .dot.active { background: var(--accent); width: 24px; border-radius: 4px; }
+
+  /* ── DOCUMENTER NOTE ── */
+  .doc-note {
+    background: rgba(124,106,247,0.06);
+    border: 1px dashed rgba(124,106,247,0.2);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-top: 24px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .doc-note strong { color: var(--accent); }
+
+  .divider { height: 1px; background: var(--border); margin: 32px 0; }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .role-grid { grid-template-columns: 1fr; }
+    .intro-title { font-size: 34px; }
+    .health-bar { gap: 16px; flex-wrap: wrap; }
+    .outcome-stats { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Campus<span>Connect</span> <span style="color:var(--accent2);">Crisis</span></div>
+  <div class="header-meta">
+    <span class="badge live">● LIVE SIM</span>
+    <span class="badge" id="round-badge">Intro</span>
+  </div>
+</header>
+
+<div class="health-bar">
+  <div class="metric">
+    <div class="metric-label">Budget</div>
+    <div class="metric-bar"><div class="metric-fill" id="bar-budget" style="width:80%;background:#4fc98e"></div></div>
+    <div class="metric-value" id="val-budget">80%</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Team Morale</div>
+    <div class="metric-bar"><div class="metric-fill" id="bar-morale" style="width:65%;background:#f0c644"></div></div>
+    <div class="metric-value" id="val-morale">65%</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Stakeholder Trust</div>
+    <div class="metric-bar"><div class="metric-fill" id="bar-trust" style="width:70%;background:#4fc98e"></div></div>
+    <div class="metric-value" id="val-trust">70%</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Scope Control</div>
+    <div class="metric-bar"><div class="metric-fill" id="bar-scope" style="width:50%;background:#e86b4f"></div></div>
+    <div class="metric-value" id="val-scope">50%</div>
+  </div>
+  <div style="margin-left:auto;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);">
+    Group choices shape your outcome
+  </div>
+</div>
+
+<main>
+
+<!-- ──────────────────── INTRO ──────────────────── -->
+<section class="screen active" id="screen-intro">
+  <div class="intro-eyebrow">PM Foundations · Chapter 10 · Group Simulation</div>
+  <h1 class="intro-title">You just inherited<br/><em>a mess.</em></h1>
+  <p class="intro-sub">CampusConnect — a student event management app — launches in 14 days. The previous PM resigned. You're in. And things are already on fire.</p>
+
+  <p style="font-size:13px;color:var(--muted);margin-bottom:16px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px;">Assign your team roles (4 members)</p>
+  <div class="role-grid">
+    <div class="role-card" onclick="selectRole(this, 'pm')">
+      <div class="role-emoji">🧑‍💼</div>
+      <div class="role-name">Project Manager</div>
+      <div class="role-desc">Leads discussion, calls the final decision each round, speaks in the role play</div>
+      <div class="role-responsibility">→ Reads scenario aloud</div>
+    </div>
+    <div class="role-card" onclick="selectRole(this, 'dev')">
+      <div class="role-emoji">💻</div>
+      <div class="role-name">Lead Developer</div>
+      <div class="role-desc">Advocates for the team's technical limits — speaks up when something is unrealistic</div>
+      <div class="role-responsibility">→ Argues the tech angle</div>
+    </div>
+    <div class="role-card" onclick="selectRole(this, 'liaison')">
+      <div class="role-emoji">📣</div>
+      <div class="role-name">Stakeholder Liaison</div>
+      <div class="role-desc">Represents the client's pressure and expectations in every debate</div>
+      <div class="role-responsibility">→ Argues the client angle</div>
+    </div>
+    <div class="role-card" onclick="selectRole(this, 'doc')">
+      <div class="role-emoji">📋</div>
+      <div class="role-name">Documenter</div>
+      <div class="role-desc">Records every decision and the group's reasoning — fills out the Incident Report</div>
+      <div class="role-responsibility">→ Notes choices + reasons</div>
+    </div>
+  </div>
+
+  <button class="start-btn" id="start-btn" onclick="startSim()" disabled>Begin Simulation →</button>
+  <div class="doc-note" style="margin-top:20px">
+    <strong>📋 Documenter:</strong> Keep notes on every choice your group makes AND why. You'll need this for the PM Incident Report submission.
+  </div>
+</section>
+
+<!-- ──────────────────── ROUND 1 ──────────────────── -->
+<section class="screen" id="screen-r1">
+  <div class="progress-dots">
+    <div class="dot active"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+  </div>
+  <div class="round-header">
+    <div class="round-tag"><span class="round-dot"></span> Round 1 of 4</div>
+    <div class="round-title">The Scope Bomb</div>
+  </div>
+
+  <div class="incoming">
+    <div class="incoming-from">📱 Slack — from: Marco (Senior Dev) · 9:02 AM</div>
+    <div class="incoming-text">"Hey, welcome aboard. Quick heads-up — the client added a live chat feature to the requirements last week. Nobody told the old PM officially, but it's in the latest email chain. It's... not small."</div>
+  </div>
+
+  <div class="scenario-box">
+    <div class="scenario-label">Situation</div>
+    <div class="scenario-text">
+      You dig into the project files. The live chat feature would take <strong>at least 2 weeks</strong> to build — and you only have 14 days until launch. The original approved scope doesn't include it. The client's email does. Your team doesn't know yet.<br/><br/>
+      <strong>This is your first decision as PM.</strong>
+    </div>
+  </div>
+
+  <div class="timer-wrap">
+    <div class="timer-label">Decide in</div>
+    <div class="timer-display" id="timer-r1">2:30</div>
+    <div class="timer-track"><div class="timer-progress" id="timer-bar-r1" style="width:100%"></div></div>
+  </div>
+
+  <div class="choices-label">Your group must debate and agree — PM makes the final call</div>
+  <div class="choices">
+    <button class="choice-btn" onclick="chooseR1('A')">
+      <span class="choice-key">Option A</span>
+      <div class="choice-text">Escalate immediately — send a formal scope change request to the client and sponsor today</div>
+      <div class="choice-sub">Transparent, but risks a difficult first impression with the client</div>
+    </button>
+    <button class="choice-btn" onclick="chooseR1('B')">
+      <span class="choice-key">Option B</span>
+      <div class="choice-text">Absorb it quietly — tell the team to figure it out and protect the launch date at all costs</div>
+      <div class="choice-sub">Keeps things moving, but the team is already stretched</div>
+    </button>
+    <button class="choice-btn" onclick="chooseR1('C')">
+      <span class="choice-key">Option C</span>
+      <div class="choice-text">Call a team meeting first — understand the full picture before deciding what to tell the client</div>
+      <div class="choice-sub">Thorough, but delays escalation by at least a day</div>
+    </button>
+  </div>
+  <div class="doc-note"><strong>📋 Documenter:</strong> Note which option your group chose and the main argument that won the debate.</div>
+</section>
+
+<!-- R1 consequence -->
+<section class="screen" id="screen-r1-result"></section>
+
+<!-- ──────────────────── ROUND 2 ──────────────────── -->
+<section class="screen" id="screen-r2">
+  <div class="progress-dots">
+    <div class="dot done"></div>
+    <div class="dot active"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+  </div>
+  <div class="round-header">
+    <div class="round-tag"><span class="round-dot"></span> Round 2 of 4</div>
+    <div class="round-title">Team vs. Client</div>
+  </div>
+
+  <div class="incoming">
+    <div class="incoming-from">📧 Email — from: Director Santos (Client) · 11:48 AM</div>
+    <div class="incoming-text">"The live chat is non-negotiable for us — our student board voted on it. I trust your team can make it work. We're counting on you."</div>
+  </div>
+
+  <div class="scenario-box">
+    <div class="scenario-label">Situation</div>
+    <div class="scenario-text">
+      Your lead developer pulls you aside: <strong>"If we build live chat, we skip testing. And if we skip testing, I can't promise the app won't crash on launch day — in front of everyone."</strong><br/><br/>
+      Director Santos has no technical background. She believes "make it work" is a reasonable ask. Your team is already logging 10-hour days.
+    </div>
+  </div>
+
+  <div class="timer-wrap">
+    <div class="timer-label">Decide in</div>
+    <div class="timer-display" id="timer-r2">2:30</div>
+    <div class="timer-track"><div class="timer-progress" id="timer-bar-r2" style="width:100%"></div></div>
+  </div>
+
+  <div class="choices-label">What does the PM do?</div>
+  <div class="choices">
+    <button class="choice-btn" onclick="chooseR2('A')">
+      <span class="choice-key">Option A</span>
+      <div class="choice-text">Side with the developer — push back on the client with a written technical risk memo</div>
+      <div class="choice-sub">Protects the team, but could damage the client relationship</div>
+    </button>
+    <button class="choice-btn" onclick="chooseR2('B')">
+      <span class="choice-key">Option B</span>
+      <div class="choice-text">Side with the client — commit to the feature and tell the team to find a way</div>
+      <div class="choice-sub">Preserves the relationship, but morale may collapse</div>
+    </button>
+    <button class="choice-btn" onclick="chooseR2('C')">
+      <span class="choice-key">Option C</span>
+      <div class="choice-text">Reframe live chat as a Phase 2 feature — propose a "coming soon" placeholder at launch</div>
+      <div class="choice-sub">Creative compromise, but requires selling it to a client who said "non-negotiable"</div>
+    </button>
+  </div>
+  <div class="doc-note"><strong>📋 Documenter:</strong> Note the decision and what your Stakeholder Liaison and Developer argued.</div>
+</section>
+
+<section class="screen" id="screen-r2-result"></section>
+
+<!-- ──────────────────── ROUND 3 ──────────────────── -->
+<section class="screen" id="screen-r3">
+  <div class="progress-dots">
+    <div class="dot done"></div>
+    <div class="dot done"></div>
+    <div class="dot active"></div>
+    <div class="dot"></div>
+  </div>
+  <div class="round-header">
+    <div class="round-tag"><span class="round-dot"></span> Round 3 of 4</div>
+    <div class="round-title">The Cover-Up Temptation</div>
+  </div>
+
+  <div class="incoming">
+    <div class="incoming-from">💬 DM — from: Rina (UX Lead) · 3:15 PM</div>
+    <div class="incoming-text">"I found a bug in the event registration flow. It's not crashing the app — but it records duplicate signups sometimes. Maybe 1 in 10 users. I don't think anyone else noticed."</div>
+  </div>
+
+  <div class="scenario-box">
+    <div class="scenario-label">Situation</div>
+    <div class="scenario-text">
+      You're 4 days from launch. Fixing this bug properly takes <strong>2–3 days</strong>. A quick patch might reduce it to 1 in 20 users. Or you could log it as a known issue, launch, and fix it post-launch — but the client won't know. <strong>This is an ethics decision.</strong>
+    </div>
+  </div>
+
+  <div class="timer-wrap">
+    <div class="timer-label">Decide in</div>
+    <div class="timer-display" id="timer-r3">2:30</div>
+    <div class="timer-track"><div class="timer-progress" id="timer-bar-r3" style="width:100%"></div></div>
+  </div>
+
+  <div class="choices-label">What does your team do?</div>
+  <div class="choices">
+    <button class="choice-btn" onclick="chooseR3('A')">
+      <span class="choice-key">Option A</span>
+      <div class="choice-text">Disclose the bug to the client now — delay launch by 3 days to fix it properly</div>
+      <div class="choice-sub">Ethical and transparent, but another delay will frustrate the client</div>
+    </button>
+    <button class="choice-btn" onclick="chooseR3('B')">
+      <span class="choice-key">Option B</span>
+      <div class="choice-text">Apply the quick patch, don't tell the client, and plan a silent post-launch fix</div>
+      <div class="choice-sub">Launch stays on track, but you're knowingly hiding a defect</div>
+    </button>
+    <button class="choice-btn" onclick="chooseR3('C')">
+      <span class="choice-key">Option C</span>
+      <div class="choice-text">Disclose it as a "minor known issue" in the launch notes with a fix date committed</div>
+      <div class="choice-sub">Honest but downplayed — tests whether transparency can coexist with optimism</div>
+    </button>
+  </div>
+  <div class="doc-note"><strong>📋 Documenter:</strong> This round connects directly to PM ethics — note the group's reasoning carefully.</div>
+</section>
+
+<section class="screen" id="screen-r3-result"></section>
+
+<!-- ──────────────────── ROUND 4 ──────────────────── -->
+<section class="screen" id="screen-r4">
+  <div class="progress-dots">
+    <div class="dot done"></div>
+    <div class="dot done"></div>
+    <div class="dot done"></div>
+    <div class="dot active"></div>
+  </div>
+  <div class="round-header">
+    <div class="round-tag"><span class="round-dot"></span> Round 4 of 4 · Final Decision</div>
+    <div class="round-title">Launch or Hold?</div>
+  </div>
+
+  <div class="incoming">
+    <div class="incoming-from">📱 Text — from: Director Santos · 6:47 AM (Launch Day)</div>
+    <div class="incoming-text">"Good morning! We're so excited. 300 students registered overnight. The dean's office will be watching the dashboard live. Today's the day! 🎉"</div>
+  </div>
+
+  <div class="scenario-box">
+    <div class="scenario-label">Situation</div>
+    <div class="scenario-text">
+      It's launch morning. Your developer just found that under heavy load — like, say, <strong>300 concurrent signups</strong> — the server may time out. It's never been tested at this scale. It might be fine. It might not.<br/><br/>
+      The dean is watching. 300 students are waiting. You have 45 minutes before the platform goes live.
+    </div>
+  </div>
+
+  <div class="timer-wrap">
+    <div class="timer-label">Decide in</div>
+    <div class="timer-display" id="timer-r4">2:00</div>
+    <div class="timer-track"><div class="timer-progress" id="timer-bar-r4" style="width:100%"></div></div>
+  </div>
+
+  <div class="choices-label">This is your final call as PM.</div>
+  <div class="choices">
+    <button class="choice-btn" onclick="chooseR4('A')">
+      <span class="choice-key">Option A</span>
+      <div class="choice-text">Launch as planned — trust the team's work and manage issues reactively if they arise</div>
+      <div class="choice-sub">Honors the commitment. High reward, high risk.</div>
+    </button>
+    <button class="choice-btn" onclick="chooseR4('B')">
+      <span class="choice-key">Option B</span>
+      <div class="choice-text">Hold the launch — notify the client and the dean right now, reschedule for next week</div>
+      <div class="choice-sub">Professionally responsible. Very uncomfortable to execute in 45 minutes.</div>
+    </button>
+    <button class="choice-btn" onclick="chooseR4('C')">
+      <span class="choice-key">Option C</span>
+      <div class="choice-text">Soft launch — limit access to 50 users for a "beta phase," expand after stability is confirmed</div>
+      <div class="choice-sub">Smart risk management, but 250 students will be locked out and won't know why.</div>
+    </button>
+  </div>
+  <div class="doc-note"><strong>📋 Documenter:</strong> Final decision noted. After this, your group gets your outcome + role play brief.</div>
+</section>
+
+<section class="screen" id="screen-r4-result"></section>
+
+<!-- ──────────────────── OUTCOME ──────────────────── -->
+<section class="screen" id="screen-outcome"></section>
+
+</main>
+
+<script>
+// ── STATE ──
+const state = {
+  rolesSelected: 0,
+  r1: null, r2: null, r3: null, r4: null,
+  budget: 80, morale: 65, trust: 70, scope: 50,
+  timerInterval: null
+};
+
+// ── ROLE SELECTION ──
+function selectRole(el, role) {
+  el.classList.toggle('selected');
+  const selected = document.querySelectorAll('.role-card.selected').length;
+  document.getElementById('start-btn').disabled = selected !== 4;
+}
+
+// ── HEALTH UPDATE ──
+function updateHealth(dBudget, dMorale, dTrust, dScope) {
+  state.budget  = Math.max(0, Math.min(100, state.budget + dBudget));
+  state.morale  = Math.max(0, Math.min(100, state.morale + dMorale));
+  state.trust   = Math.max(0, Math.min(100, state.trust + dTrust));
+  state.scope   = Math.max(0, Math.min(100, state.scope + dScope));
+  const color = v => v >= 60 ? '#4fc98e' : v >= 35 ? '#f0c644' : '#e84f4f';
+  ['budget','morale','trust','scope'].forEach(k => {
+    document.getElementById('bar-'+k).style.width = state[k]+'%';
+    document.getElementById('bar-'+k).style.background = color(state[k]);
+    document.getElementById('val-'+k).textContent = state[k]+'%';
+  });
+}
+
+// ── SCREEN NAV ──
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+// ── TIMER ──
+function startTimer(id, barId, seconds, onEnd) {
+  clearInterval(state.timerInterval);
+  let remaining = seconds;
+  const el = document.getElementById(id);
+  const bar = document.getElementById(barId);
+  function tick() {
+    const m = Math.floor(remaining / 60);
+    const s = remaining % 60;
+    el.textContent = m + ':' + String(s).padStart(2,'0');
+    bar.style.width = (remaining / seconds * 100) + '%';
+    bar.style.background = remaining <= 30 ? '#e84f4f' : '#f0c644';
+    el.classList.toggle('urgent', remaining <= 30);
+    if (remaining <= 0) { clearInterval(state.timerInterval); if (onEnd) onEnd(); }
+    remaining--;
+  }
+  tick();
+  state.timerInterval = setInterval(tick, 1000);
+}
+
+// ── CONSEQUENCE RENDER ──
+function renderConsequence(screenId, type, icon, title, text, nextFn) {
+  const s = document.getElementById(screenId);
+  const cls = type; // positive / negative / mixed
+  s.innerHTML = `
+    <div class="consequence ${cls}">
+      <span class="consequence-icon">${icon}</span>
+      <div class="consequence-title">${title}</div>
+      <div class="consequence-text">${text}</div>
+    </div>
+    <button class="next-btn" onclick="${nextFn}">Continue →</button>
+  `;
+  show(screenId);
+}
+
+// ──────────────── ROUND 1 ────────────────
+function startSim() {
+  show('screen-r1');
+  document.getElementById('round-badge').textContent = 'Round 1';
+  startTimer('timer-r1','timer-bar-r1',150, () => {
+    disableChoices('screen-r1');
+    alert('⏰ Time\'s up! PM must call it now.');
+  });
+}
+function disableChoices(screenId) {
+  document.querySelectorAll(`#${screenId} .choice-btn`).forEach(b => b.disabled = true);
+}
+function chooseR1(opt) {
+  clearInterval(state.timerInterval);
+  disableChoices('screen-r1');
+  state.r1 = opt;
+  if (opt === 'A') {
+    updateHealth(0, 0, +15, +20);
+    renderConsequence('screen-r1-result','positive','📤','Transparency wins early trust',
+      'You send a formal scope change request by noon. It\'s uncomfortable, but Director Santos actually respects your directness. She agrees to a scoping call tomorrow. The team exhales — someone\'s finally being straight with them.',
+      'startR2()');
+  } else if (opt === 'B') {
+    updateHealth(-10, -15, 0, -10);
+    renderConsequence('screen-r1-result','negative','🔥','The team is burning out',
+      'Morale drops overnight. Marco sends a passive-aggressive Slack at midnight. The client doesn\'t know yet, but your team does — and they\'re quietly furious that nobody told the client the truth.',
+      'startR2()');
+  } else {
+    updateHealth(0, +5, -5, +10);
+    renderConsequence('screen-r1-result','mixed','🕐','Informed, but a day behind',
+      'The team meeting surfaces useful context — the dev estimate was actually closer to 10 days, not 14. But while you were meeting, Director Santos sent a follow-up email asking for a status update. She\'s already wondering why nobody responded.',
+      'startR2()');
+  }
+}
+
+// ──────────────── ROUND 2 ────────────────
+function startR2() {
+  show('screen-r2');
+  document.getElementById('round-badge').textContent = 'Round 2';
+  startTimer('timer-r2','timer-bar-r2',150);
+}
+function chooseR2(opt) {
+  clearInterval(state.timerInterval);
+  disableChoices('screen-r2');
+  state.r2 = opt;
+  if (opt === 'A') {
+    updateHealth(0, +15, -10, +15);
+    renderConsequence('screen-r2-result','mixed','📝','Team protected, client unhappy',
+      'Your risk memo is professional and clear. The developer is visibly relieved. Director Santos pushes back hard — "I thought you were supposed to make this happen." The relationship is strained, but the decision is documented and defensible.',
+      'startR3()');
+  } else if (opt === 'B') {
+    updateHealth(-5, -20, +10, -10);
+    renderConsequence('screen-r2-result','negative','😤','Client happy. Team broken.',
+      'The developer submits the feature at 2 AM. Three others quietly ask if you\'re the right PM for this project. The client sends a warm thank-you. Your morale metric is now critical.',
+      'startR3()');
+  } else {
+    updateHealth(0, +10, +5, +5);
+    renderConsequence('screen-r2-result','positive','🤝','Negotiation pulls through',
+      '"Coming Soon — Live Chat launching in two weeks." The dev team builds a polished placeholder. Director Santos isn\'t thrilled but calls it "acceptable." Your Phase 2 plan is now on the record. This was hard to sell — and you sold it.',
+      'startR3()');
+  }
+}
+
+// ──────────────── ROUND 3 ────────────────
+function startR3() {
+  show('screen-r3');
+  document.getElementById('round-badge').textContent = 'Round 3';
+  startTimer('timer-r3','timer-bar-r3',150);
+}
+function chooseR3(opt) {
+  clearInterval(state.timerInterval);
+  disableChoices('screen-r3');
+  state.r3 = opt;
+  if (opt === 'A') {
+    updateHealth(-5, +10, +20, +10);
+    renderConsequence('screen-r3-result','positive','✅','Painful honesty. Lasting trust.',
+      'Director Santos is annoyed about the delay. But when the launch finally happens — clean, no bugs — she tells the dean: "Our PM didn\'t let us launch broken software. That\'s the kind of team I want." Trust: restored.',
+      'startR4()');
+  } else if (opt === 'B') {
+    updateHealth(0, -5, -20, -10);
+    renderConsequence('screen-r3-result','negative','🚨','The bug gets noticed.',
+      'On launch day, a student rep tweets about getting registered for 3 events she only signed up for once. The client emails you within the hour. You knew. You didn\'t say. That\'s now the story.',
+      'startR4()');
+  } else {
+    updateHealth(0, +5, +5, +5);
+    renderConsequence('screen-r3-result','mixed','📄','Disclosed — but barely.',
+      '"Known Issue: Occasional duplicate registration. Fix scheduled within 72 hours." Most people miss it in the launch notes. The client does not. She calls to ask why this wasn\'t raised earlier. You have an answer — but it\'s uncomfortable.',
+      'startR4()');
+  }
+}
+
+// ──────────────── ROUND 4 ────────────────
+function startR4() {
+  show('screen-r4');
+  document.getElementById('round-badge').textContent = 'Round 4';
+  startTimer('timer-r4','timer-bar-r4',120);
+}
+function chooseR4(opt) {
+  clearInterval(state.timerInterval);
+  disableChoices('screen-r4');
+  state.r4 = opt;
+
+  let icon, title, text;
+  if (opt === 'A') {
+    if (state.trust >= 65 && state.morale >= 55) {
+      icon='🚀'; title='Smooth launch — mostly'; updateHealth(0,+10,+15,+10);
+      text='The app holds. There\'s a 2-minute slowdown at 9:08 AM that makes everyone sweat, then it clears. 287 students successfully registered. The dean nods at the dashboard. You buy the team coffee.';
+    } else {
+      icon='💥'; title='Server timeout at peak load'; updateHealth(-20,-20,-25,-10);
+      text='The team warned you. At 9:11 AM the server returns a 503 to 200+ students simultaneously. The dean\'s dashboard goes white. Director Santos calls. The post-mortem is brutal — but it\'s also a real education in risk management.';
+    }
+  } else if (opt === 'B') {
+    icon='⏸️'; title='Hold. Breathe. Reschedule.'; updateHealth(0,+5,-10,+15);
+    updateHealth(0,0,0,0);
+    text='The call to Director Santos at 7 AM is the hardest 8 minutes of the project. She\'s upset. But you\'re calm, professional, and have a new date ready. The next launch goes flawlessly. "This PM takes quality seriously," she tells her board.';
+  } else {
+    updateHealth(-5, +5, 0, +10);
+    icon='🧪'; title='Beta holds — but 250 people are confused';
+    text='The 50-user soft launch runs perfectly. By 10 AM you\'ve scaled to 150, then 300. But 250 students received no explanation for why they couldn\'t access the app at launch. Social media is mildly chaotic. You manage it — just barely.';
+  }
+
+  const r4Screen = document.getElementById('screen-r4-result');
+  r4Screen.innerHTML = `
+    <div class="consequence ${state.trust >= 55 && state.morale >= 40 ? 'positive' : 'mixed'}">
+      <span class="consequence-icon">${icon}</span>
+      <div class="consequence-title">${title}</div>
+      <div class="consequence-text">${text}</div>
+    </div>
+    <button class="next-btn" onclick="showOutcome()" style="margin-top:20px">See your outcome →</button>
+  `;
+  show('screen-r4-result');
+}
+
+// ──────────────── OUTCOME ────────────────
+function showOutcome() {
+  document.getElementById('round-badge').textContent = 'Outcome';
+  const overall = state.trust + state.morale + state.budget + state.scope;
+  let emoji, title, desc, color;
+  if (overall >= 295) {
+    emoji='🏆'; title='Exemplary PM'; color='var(--accent3)';
+    desc='You navigated the crisis with integrity, communication, and smart negotiation. The client trusts you. The team respects you. CampusConnect launched — not perfectly, but responsibly. This is what great project management looks like.';
+  } else if (overall >= 240) {
+    emoji='✅'; title='Project Delivered'; color='var(--accent)';
+    desc='The app launched. Some relationships took a hit, some didn\'t. You made defensible calls under pressure — not all of them comfortable, but most of them sound. That\'s real PM work.';
+  } else if (overall >= 185) {
+    emoji='⚠️'; title='Delivered — With Consequences'; color='var(--warn)';
+    desc='The project finished, but trust is strained and the team is exhausted. The decisions were understandable but each one compounded. A post-mortem will be needed — and it\'s a valuable one.';
+  } else {
+    emoji='🔥'; title='The Project Survived. Barely.'; color='var(--accent2)';
+    desc='CampusConnect launched, but the ethics shortcuts and morale damage left a mark. The client is disappointed. The team is burned out. This outcome is actually the richest for discussion — what would you do differently?';
+  }
+
+  const roleplayBrief = buildRoleplayBrief();
+
+  document.getElementById('screen-outcome').innerHTML = `
+    <div class="outcome-wrapper">
+      <span class="outcome-emoji">${emoji}</span>
+      <div class="outcome-label">Your team's outcome</div>
+      <h2 class="outcome-title" style="color:${color}">${title}</h2>
+      <p class="outcome-desc">${desc}</p>
+
+      <div class="outcome-stats">
+        <div class="stat-box">
+          <span class="stat-num" style="color:${state.budget>=60?'var(--accent3)':'var(--accent2)'}">${state.budget}%</span>
+          <div class="stat-label">Final Budget Health</div>
+        </div>
+        <div class="stat-box">
+          <span class="stat-num" style="color:${state.morale>=60?'var(--accent3)':'var(--accent2)'}">${state.morale}%</span>
+          <div class="stat-label">Team Morale</div>
+        </div>
+        <div class="stat-box">
+          <span class="stat-num" style="color:${state.trust>=60?'var(--accent3)':'var(--accent2)'}">${state.trust}%</span>
+          <div class="stat-label">Stakeholder Trust</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div style="text-align:left">
+        <h3 style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:16px;color:var(--accent)">🎭 Role Play Brief</h3>
+        <p style="color:var(--muted);font-size:14px;margin-bottom:20px">If your group is called to perform in the main room, use this guide. If not, this informs your Incident Report.</p>
+        ${roleplayBrief}
+      </div>
+
+      <div class="divider"></div>
+      <div class="doc-note" style="text-align:left;margin-bottom:28px">
+        <strong>📋 Documenter — Incident Report Checklist:</strong><br/>
+        Round 1: ${state.r1} &nbsp;|&nbsp; Round 2: ${state.r2} &nbsp;|&nbsp; Round 3: ${state.r3} &nbsp;|&nbsp; Round 4: ${state.r4}<br/>
+        Final metrics: Budget ${state.budget}% · Morale ${state.morale}% · Trust ${state.trust}% · Scope ${state.scope}%<br/>
+        Outcome: ${title}
+      </div>
+
+      <div class="btn-row">
+        <button class="restart-btn" onclick="restartSim()">↺ Run again with different choices</button>
+      </div>
+    </div>
+  `;
+  show('screen-outcome');
+}
+
+function buildRoleplayBrief() {
+  const choices = { r1: state.r1, r2: state.r2, r3: state.r3, r4: state.r4 };
+  const tension = state.trust < 60 ? 'The client is clearly unsatisfied — expect tough questions.' : 'The client is cautiously positive — you need to maintain that.';
+  const teamMood = state.morale < 50 ? 'Your team is exhausted and morale is low — the Developer should show it.' : 'The team is holding together — a sense of hard-won pride is appropriate.';
+
+  return `
+    <div class="roleplay-card">
+      <h3>The Scene</h3>
+      <p>You are on a Zoom debrief call with Director Santos — the client — 48 hours after launch. Each member stays in their role. The call is 3–5 minutes.</p>
+      <p><strong style="color:var(--warn)">${tension}</strong></p>
+      <p><em style="color:var(--muted)">${teamMood}</em></p>
+
+      <h3 style="margin-top:20px">Opening Line (Project Manager)</h3>
+      <div class="script-item">
+        <div class="script-role">🧑‍💼 Project Manager opens the call:</div>
+        <div class="script-line">"Director Santos, thank you for joining us. We wanted to walk you through what happened, what we learned, and what we're doing next."</div>
+      </div>
+
+      <h3 style="margin-top:20px">Director Santos will ask (your instructor plays this role):</h3>
+      <div class="script-item"><div class="script-role">❓ Question 1</div><div class="script-line">"Walk me through the decisions that affected the timeline."</div></div>
+      <div class="script-item"><div class="script-role">❓ Question 2</div><div class="script-line">"What would you do differently if we ran this project again?"</div></div>
+      <div class="script-item"><div class="script-role">❓ Question 3 (if ethics issue arose)</div><div class="script-line">"Was there ever a point where you had information that I should have known about earlier?"</div></div>
+
+      <h3 style="margin-top:20px">Each Member's Role in the Call</h3>
+      <div class="script-item"><div class="script-role">🧑‍💼 PM</div><div class="script-line">Owns the narrative. Takes accountability. Doesn't blame the team.</div></div>
+      <div class="script-item"><div class="script-role">💻 Developer</div><div class="script-line">Explains one technical decision in plain language. Honest about constraints.</div></div>
+      <div class="script-item"><div class="script-role">📣 Liaison</div><div class="script-line">Acknowledges what the client expected and where gaps appeared.</div></div>
+      <div class="script-item"><div class="script-role">📋 Documenter</div><div class="script-line">Has the data ready — can quote metrics, timelines, or decisions if asked.</div></div>
+    </div>
+  `;
+}
+
+function restartSim() {
+  state.r1=null; state.r2=null; state.r3=null; state.r4=null;
+  state.budget=80; state.morale=65; state.trust=70; state.scope=50;
+  updateHealth(0,0,0,0);
+  document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('start-btn').disabled = true;
+  document.getElementById('round-badge').textContent = 'Intro';
+  show('screen-intro');
+}
+</script>
+</body>
+</html>
